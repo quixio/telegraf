@@ -3,6 +3,7 @@ package quix
 
 import (
 	"crypto/sha256"
+	"crypto/sha512"
 	"strings"
 
 	"github.com/IBM/sarama"
@@ -69,11 +70,22 @@ func (q *Quix) Connect() error {
 	config.Net.SASL.Enable = true
 	config.Net.SASL.User = quixConfig.SaslUsername
 	config.Net.SASL.Password = quixConfig.SaslPassword
-	config.Net.SASL.Mechanism = sarama.SASLTypeSCRAMSHA256
-	config.Net.SASL.SCRAMClientGeneratorFunc = func() sarama.SCRAMClient {
-		return &XDGSCRAMClient{HashGeneratorFcn: sha256.New}
+    
+    switch quixConfig.SaslMechanism {
+	case "SCRAM-SHA-512":
+		config.Net.SASL.SCRAMClientGeneratorFunc = func() sarama.SCRAMClient {
+			return &XDGSCRAMClient{HashGeneratorFcn: sha512.New}
+		}
+		config.Net.SASL.Mechanism = sarama.SASLTypeSCRAMSHA512
+	case "SCRAM-SHA-256":
+		config.Net.SASL.SCRAMClientGeneratorFunc = func() sarama.SCRAMClient {
+			return &XDGSCRAMClient{HashGeneratorFcn: sha256.New}
+		}
+		config.Net.SASL.Mechanism = sarama.SASLTypeSCRAMSHA256
+	default:
+		q.Log.Errorf("Unsupported SASL mechanism: %s", quixConfig.SaslMechanism)
 	}
-
+    
 	tlsConfig, err := q.createTLSConfig(cert)
 	if err != nil {
 		return err
